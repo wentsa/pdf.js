@@ -598,9 +598,10 @@ class WidgetAnnotation extends Annotation {
     data.readOnly = this.hasFieldFlag(AnnotationFieldFlag.READONLY);
 
     // Hide signatures because we cannot validate them.
-    if (data.fieldType === 'Sig') {
-      this.setFlags(AnnotationFlag.HIDDEN);
-    }
+    // if (data.fieldType === 'Sig') {
+    //   this.setFlags(AnnotationFlag.HIDDEN);
+    // }
+    // TCH we need to see Sig widgets even not validated
   }
 
   /**
