@@ -1,6 +1,7 @@
 *~
 local.mk
 build/
+!build/dist
 tags
 .DS_Store
 Makefile
