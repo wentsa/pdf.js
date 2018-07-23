@@ -16,6 +16,18 @@
 
 'use strict';
 
+// polyfill for IE10
+if (window.CanvasPixelArray) {
+    window.CanvasPixelArray.prototype.set = function(arr) {
+        var l = this.length;
+        var i = 0;
+
+        for (;i < l; i++) {
+            this[i] = arr[i];
+        }
+    };
+}
+
 var pdfjsVersion =
   typeof PDFJSDev !== 'undefined' ? PDFJSDev.eval('BUNDLE_VERSION') : void 0;
 var pdfjsBuild =

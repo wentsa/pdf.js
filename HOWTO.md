@@ -1,7 +1,7 @@
 ### BUILD
 remove `./build/*`
 
-run `npm cache clean`
+run `npm cache clean --force`
 
 run `gulp dist-install --max_old_space_size=8192` and make sure enough memory is free
 
