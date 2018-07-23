@@ -13,8 +13,6 @@
  * limitations under the License.
  */
 
-import { createPromiseCapability } from 'pdfjs-lib';
-
 const CSS_UNITS = 96.0 / 72.0;
 const DEFAULT_SCALE_VALUE = 'auto';
 const DEFAULT_SCALE = 1.0;
@@ -536,14 +534,6 @@ function noContextMenuHandler(evt) {
   evt.preventDefault();
 }
 
-function isFileSchema(url) {
-  let i = 0, ii = url.length;
-  while (i < ii && url[i].trim() === '') {
-    i++;
-  }
-  return url.substr(i, 7).toLowerCase() === 'file://';
-}
-
 function isDataSchema(url) {
   let i = 0, ii = url.length;
   while (i < ii && url[i].trim() === '') {
@@ -619,16 +609,6 @@ function isPortraitOrientation(size) {
   return size.width <= size.height;
 }
 
-function cloneObj(obj) {
-  let result = Object.create(null);
-  for (let i in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, i)) {
-      result[i] = obj[i];
-    }
-  }
-  return result;
-}
-
 const WaitOnType = {
   EVENT: 'event',
   TIMEOUT: 'timeout',
@@ -652,43 +632,48 @@ const WaitOnType = {
  * @returns {Promise} A promise that is resolved with a {WaitOnType} value.
  */
 function waitOnEventOrTimeout({ target, name, delay = 0, }) {
-  if (typeof target !== 'object' || !(name && typeof name === 'string') ||
-      !(Number.isInteger(delay) && delay >= 0)) {
-    return Promise.reject(
-      new Error('waitOnEventOrTimeout - invalid parameters.'));
-  }
-  let capability = createPromiseCapability();
+  return new Promise(function(resolve, reject) {
+    if (typeof target !== 'object' || !(name && typeof name === 'string') ||
+        !(Number.isInteger(delay) && delay >= 0)) {
+      throw new Error('waitOnEventOrTimeout - invalid parameters.');
+    }
 
-  function handler(type) {
+    function handler(type) {
+      if (target instanceof EventBus) {
+        target.off(name, eventHandler);
+      } else {
+        target.removeEventListener(name, eventHandler);
+      }
+
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+      resolve(type);
+    }
+
+    const eventHandler = handler.bind(null, WaitOnType.EVENT);
     if (target instanceof EventBus) {
-      target.off(name, eventHandler);
+      target.on(name, eventHandler);
     } else {
-      target.removeEventListener(name, eventHandler);
+      target.addEventListener(name, eventHandler);
     }
 
-    if (timeout) {
-      clearTimeout(timeout);
-    }
-    capability.resolve(type);
-  }
-
-  let eventHandler = handler.bind(null, WaitOnType.EVENT);
-  if (target instanceof EventBus) {
-    target.on(name, eventHandler);
-  } else {
-    target.addEventListener(name, eventHandler);
-  }
-
-  let timeoutHandler = handler.bind(null, WaitOnType.TIMEOUT);
-  let timeout = setTimeout(timeoutHandler, delay);
-
-  return capability.promise;
+    const timeoutHandler = handler.bind(null, WaitOnType.TIMEOUT);
+    let timeout = setTimeout(timeoutHandler, delay);
+  });
 }
 
 /**
  * Promise that is resolved when DOM window becomes visible.
  */
 let animationStarted = new Promise(function (resolve) {
+  if ((typeof PDFJSDev !== 'undefined' && PDFJSDev.test('LIB')) &&
+      typeof window === 'undefined') {
+    // Prevent "ReferenceError: window is not defined" errors when running the
+    // unit-tests in Node.js/Travis.
+    setTimeout(resolve, 20);
+    return;
+  }
   window.requestAnimationFrame(resolve);
 });
 
@@ -843,8 +828,6 @@ export {
   VERTICAL_PADDING,
   isValidRotation,
   isPortraitOrientation,
-  isFileSchema,
-  cloneObj,
   PresentationModeState,
   RendererType,
   TextLayerMode,

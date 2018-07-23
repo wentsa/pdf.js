@@ -5,7 +5,8 @@
   },
 
   "plugins": [
-    "mozilla"
+    "mozilla",
+    "unicorn",
   ],
 
   "env": {
@@ -25,6 +26,7 @@
     // Plugins
     "mozilla/avoid-removeChild": "error",
     "mozilla/use-includes-instead-of-indexOf": "error",
+    "unicorn/no-array-instanceof": "error",
 
     // Possible errors
     "for-direction": "error",
@@ -98,6 +100,7 @@
     "no-catch-shadow": "error",
     "no-delete-var": "error",
     "no-label-var": "error",
+    "no-restricted-globals": "off",
     "no-shadow-restricted-names": "error",
     "no-shadow": "off",
     "no-undef-init": "error",

@@ -73,14 +73,6 @@ const SpreadMode = {
  *   size in total pixels, i.e. width * height. Use -1 for no limit.
  *   The default value is 4096 * 4096 (16 mega-pixels).
  * @property {IL10n} l10n - Localization service.
- * @property {number} scrollMode - (optional) The direction in which the
- *   document pages should be laid out within the scrolling container. The
- *   constants from {ScrollMode} should be used. The default value is
- *   `ScrollMode.VERTICAL`.
- * @property {number} spreadMode - (optional) If not `SpreadMode.NONE`, groups
- *   pages into spreads, starting with odd- or even-numbered pages. The
- *   constants from {SpreadMode} should be used. The default value is
- *   `SpreadMode.NONE`.
  */
 
 function PDFPageViewBuffer(size) {
@@ -162,8 +154,6 @@ class BaseViewer {
     this.useOnlyCssZoom = options.useOnlyCssZoom || false;
     this.maxCanvasPixels = options.maxCanvasPixels;
     this.l10n = options.l10n || NullL10n;
-    this.scrollMode = options.scrollMode || ScrollMode.VERTICAL;
-    this.spreadMode = options.spreadMode || SpreadMode.NONE;
 
     this.defaultRenderingQueue = !options.renderingQueue;
     if (this.defaultRenderingQueue) {
@@ -181,7 +171,24 @@ class BaseViewer {
     if (this.removePageBorders) {
       this.viewer.classList.add('removePageBorders');
     }
-    this._updateScrollModeClasses();
+
+    if ((typeof PDFJSDev === 'undefined' || PDFJSDev.test('GENERIC')) &&
+        ('scrollMode' in options || 'spreadMode' in options)) {
+      console.error(`The ${this._name} constructor options ` +
+        '`scrollMode`/`spreadMode` are deprecated, use the setters instead.');
+      if (options.scrollMode !== undefined) {
+        this.scrollMode = options.scrollMode;
+      }
+      if (options.spreadMode !== undefined) {
+        this.spreadMode = options.spreadMode;
+      }
+    }
+
+    // Defer the dispatching of this event, to give other viewer components
+    // time to initialize *and* register 'baseviewerinit' event listeners.
+    Promise.resolve().then(() => {
+      this.eventBus.dispatch('baseviewerinit', { source: this, });
+    });
   }
 
   get pagesCount() {
@@ -439,8 +446,8 @@ class BaseViewer {
         bindOnAfterAndBeforeDraw(pageView);
         this._pages.push(pageView);
       }
-      if (this.spreadMode !== SpreadMode.NONE) {
-        this._regroupSpreads();
+      if (this._spreadMode !== SpreadMode.NONE) {
+        this._updateSpreadMode();
       }
 
       // Fetch all the pages since the viewport is needed before printing
@@ -478,10 +485,6 @@ class BaseViewer {
       if (this.defaultRenderingQueue) {
         this.update();
       }
-
-      if (this.findController) {
-        this.findController.resolveFirstPage();
-      }
     }).catch((reason) => {
       console.error('Unable to initialize viewer', reason);
     });
@@ -496,7 +499,7 @@ class BaseViewer {
     }
     if (!labels) {
       this._pageLabels = null;
-    } else if (!(labels instanceof Array &&
+    } else if (!(Array.isArray(labels) &&
                  this.pdfDocument.numPages === labels.length)) {
       this._pageLabels = null;
       console.error(`${this._name}.setPageLabels: Invalid page labels.`);
@@ -522,9 +525,13 @@ class BaseViewer {
     this._pagesRotation = 0;
     this._pagesRequests = [];
     this._pageViewsReady = false;
+    this._scrollMode = ScrollMode.VERTICAL;
+    this._spreadMode = SpreadMode.NONE;
 
-    // Remove the pages from the DOM.
+    // Remove the pages from the DOM...
     this.viewer.textContent = '';
+    // ... and reset the Scroll mode CSS class(es) afterwards.
+    this._updateScrollMode();
   }
 
   _scrollUpdate() {
@@ -595,11 +602,11 @@ class BaseViewer {
       if (!currentPage) {
         return;
       }
-      let hPadding = (this.isInPresentationMode || this.removePageBorders) ?
-        0 : SCROLLBAR_PADDING;
-      let vPadding = (this.isInPresentationMode || this.removePageBorders) ?
-        0 : VERTICAL_PADDING;
-      if (this.scrollMode === ScrollMode.HORIZONTAL) {
+      const noPadding = (this.isInPresentationMode || this.removePageBorders);
+      let hPadding = noPadding ? 0 : SCROLLBAR_PADDING;
+      let vPadding = noPadding ? 0 : VERTICAL_PADDING;
+
+      if (!noPadding && this._isScrollModeHorizontal) {
         const temp = hPadding;
         hPadding = vPadding;
         vPadding = temp;
@@ -832,6 +839,10 @@ class BaseViewer {
     this.container.focus();
   }
 
+  get _isScrollModeHorizontal() {
+    throw new Error('Not implemented: _isScrollModeHorizontal');
+  }
+
   get isInPresentationMode() {
     return this.presentationModeState === PresentationModeState.FULLSCREEN;
   }
@@ -904,8 +915,8 @@ class BaseViewer {
 
   forceRendering(currentlyVisiblePages) {
     let visiblePages = currentlyVisiblePages || this._getVisiblePages();
-    let scrollAhead = this.scrollMode === ScrollMode.HORIZONTAL ?
-      this.scroll.right : this.scroll.down;
+    let scrollAhead = (this._isScrollModeHorizontal ?
+                       this.scroll.right : this.scroll.down);
     let pageView = this.renderingQueue.getHighestPriority(visiblePages,
                                                           this._pages,
                                                           scrollAhead);
@@ -1017,38 +1028,133 @@ class BaseViewer {
     });
   }
 
+  /**
+   * @return {number} One of the values in {ScrollMode}.
+   */
+  get scrollMode() {
+    return this._scrollMode;
+  }
+
+  /**
+   * @param {number} mode - The direction in which the document pages should be
+   *   laid out within the scrolling container.
+   *   The constants from {ScrollMode} should be used.
+   */
+  set scrollMode(mode) {
+    if (this._scrollMode === mode) {
+      return; // The Scroll mode didn't change.
+    }
+    if (!Number.isInteger(mode) || !Object.values(ScrollMode).includes(mode)) {
+      throw new Error(`Invalid scroll mode: ${mode}`);
+    }
+    this._scrollMode = mode;
+    this.eventBus.dispatch('scrollmodechanged', { source: this, mode, });
+
+    this._updateScrollMode(/* pageNumber = */ this._currentPageNumber);
+  }
+
+  _updateScrollMode(pageNumber = null) {
+    const scrollMode = this._scrollMode, viewer = this.viewer;
+
+    if (scrollMode === ScrollMode.HORIZONTAL) {
+      viewer.classList.add('scrollHorizontal');
+    } else {
+      viewer.classList.remove('scrollHorizontal');
+    }
+    if (scrollMode === ScrollMode.WRAPPED) {
+      viewer.classList.add('scrollWrapped');
+    } else {
+      viewer.classList.remove('scrollWrapped');
+    }
+
+    if (!this.pdfDocument || !pageNumber) {
+      return;
+    }
+    // Non-numeric scale values can be sensitive to the scroll orientation.
+    // Call this before re-scrolling to the current page, to ensure that any
+    // changes in scale don't move the current page.
+    if (this._currentScaleValue && isNaN(this._currentScaleValue)) {
+      this._setScale(this._currentScaleValue, true);
+    }
+    this.scrollPageIntoView({ pageNumber, });
+    this.update();
+  }
+
   setScrollMode(mode) {
-    if (mode !== this.scrollMode) {
+    if (typeof PDFJSDev === 'undefined' || PDFJSDev.test('GENERIC')) {
+      console.error(`${this._name}.setScrollMode() is deprecated, ` +
+                    `use the ${this._name}.scrollMode setter instead.`);
       this.scrollMode = mode;
-      this._updateScrollModeClasses();
-      this.eventBus.dispatch('scrollmodechanged', { mode, });
-      const pageNumber = this._currentPageNumber;
-      // Non-numeric scale modes can be sensitive to the scroll orientation.
-      // Call this before re-scrolling to the current page, to ensure that any
-      // changes in scale don't move the current page.
-      if (isNaN(this._currentScaleValue)) {
-        this._setScale(this._currentScaleValue, this.isInPresentationMode);
-      }
-      this.scrollPageIntoView({ pageNumber, });
-      this.update();
     }
   }
 
-  _updateScrollModeClasses() {
-    const mode = this.scrollMode, { classList, } = this.viewer;
-    classList.toggle('scrollHorizontal', mode === ScrollMode.HORIZONTAL);
-    classList.toggle('scrollWrapped', mode === ScrollMode.WRAPPED);
+  /**
+   * @return {number} One of the values in {SpreadMode}.
+   */
+  get spreadMode() {
+    return this._spreadMode;
+  }
+
+  /**
+   * @param {number} mode - Group the pages in spreads, starting with odd- or
+   *   even-number pages (unless `SpreadMode.NONE` is used).
+   *   The constants from {SpreadMode} should be used.
+   */
+  set spreadMode(mode) {
+    if (this._spreadMode === mode) {
+      return; // The Spread mode didn't change.
+    }
+    if (!Number.isInteger(mode) || !Object.values(SpreadMode).includes(mode)) {
+      throw new Error(`Invalid spread mode: ${mode}`);
+    }
+    this._spreadMode = mode;
+    this.eventBus.dispatch('spreadmodechanged', { source: this, mode, });
+
+    this._updateSpreadMode(/* pageNumber = */ this._currentPageNumber);
+  }
+
+  _updateSpreadMode(pageNumber = null) {
+    if (!this.pdfDocument) {
+      return;
+    }
+    const viewer = this.viewer, pages = this._pages;
+    // Temporarily remove all the pages from the DOM.
+    viewer.textContent = '';
+
+    if (this._spreadMode === SpreadMode.NONE) {
+      for (let i = 0, iMax = pages.length; i < iMax; ++i) {
+        viewer.appendChild(pages[i].div);
+      }
+    } else {
+      const parity = this._spreadMode - 1;
+      let spread = null;
+      for (let i = 0, iMax = pages.length; i < iMax; ++i) {
+        if (spread === null) {
+          spread = document.createElement('div');
+          spread.className = 'spread';
+          viewer.appendChild(spread);
+        } else if (i % 2 === parity) {
+          spread = spread.cloneNode(false);
+          viewer.appendChild(spread);
+        }
+        spread.appendChild(pages[i].div);
+      }
+    }
+
+    if (!pageNumber) {
+      return;
+    }
+    this.scrollPageIntoView({ pageNumber, });
+    this.update();
   }
 
   setSpreadMode(mode) {
-    if (mode !== this.spreadMode) {
+    if (typeof PDFJSDev === 'undefined' || PDFJSDev.test('GENERIC')) {
+      console.error(`${this._name}.setSpreadMode() is deprecated, ` +
+                    `use the ${this._name}.spreadMode setter instead.`);
       this.spreadMode = mode;
-      this.eventBus.dispatch('spreadmodechanged', { mode, });
-      this._regroupSpreads();
     }
   }
-
-  _regroupSpreads() {}
 }
 
 export {

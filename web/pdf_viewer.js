@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-import { BaseViewer, ScrollMode, SpreadMode } from './base_viewer';
+import { BaseViewer, ScrollMode } from './base_viewer';
 import { getVisibleElements, scrollIntoView } from './ui_utils';
 import { shadow } from 'pdfjs-lib';
 
@@ -23,11 +23,11 @@ class PDFViewer extends BaseViewer {
   }
 
   _scrollIntoView({ pageDiv, pageSpot = null, }) {
-    if (!pageSpot) {
+    if (!pageSpot && !this.isInPresentationMode) {
       const left = pageDiv.offsetLeft + pageDiv.clientLeft;
       const right = left + pageDiv.clientWidth;
       const { scrollLeft, clientWidth, } = this.container;
-      if (this.scrollMode === ScrollMode.HORIZONTAL ||
+      if (this._scrollMode === ScrollMode.HORIZONTAL ||
           left < scrollLeft || right > scrollLeft + clientWidth) {
         pageSpot = { left: 0, top: 0, };
       }
@@ -38,7 +38,7 @@ class PDFViewer extends BaseViewer {
   _getVisiblePages() {
     if (!this.isInPresentationMode) {
       return getVisibleElements(this.container, this._pages, true,
-                                this.scrollMode === ScrollMode.HORIZONTAL);
+                                this._scrollMode === ScrollMode.HORIZONTAL);
     }
     // The algorithm in getVisibleElements doesn't work in all browsers and
     // configurations when presentation mode is active.
@@ -87,32 +87,11 @@ class PDFViewer extends BaseViewer {
     });
   }
 
-  _regroupSpreads() {
-    const container = this._setDocumentViewerElement, pages = this._pages;
-    while (container.firstChild) {
-      container.firstChild.remove();
-    }
-    if (this.spreadMode === SpreadMode.NONE) {
-      for (let i = 0, iMax = pages.length; i < iMax; ++i) {
-        container.appendChild(pages[i].div);
-      }
-    } else {
-      const parity = this.spreadMode - 1;
-      let spread = null;
-      for (let i = 0, iMax = pages.length; i < iMax; ++i) {
-        if (spread === null) {
-          spread = document.createElement('div');
-          spread.className = 'spread';
-          container.appendChild(spread);
-        } else if (i % 2 === parity) {
-          spread = spread.cloneNode(false);
-          container.appendChild(spread);
-        }
-        spread.appendChild(pages[i].div);
-      }
-    }
-    this.scrollPageIntoView({ pageNumber: this._currentPageNumber, });
-    this.update();
+  get _isScrollModeHorizontal() {
+    // Used to ensure that pre-rendering of the next/previous page works
+    // correctly, since Scroll/Spread modes are ignored in Presentation Mode.
+    return (this.isInPresentationMode ?
+            false : this._scrollMode === ScrollMode.HORIZONTAL);
   }
 }
 
