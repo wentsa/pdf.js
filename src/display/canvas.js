@@ -520,6 +520,21 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
 
       j = 0;
       elemsInThisChunk = width * FULL_CHUNK_HEIGHT * 4;
+
+      // CUSTOM CODE
+      var prototype = Object.getPrototypeOf(dest);
+      if (!prototype.set) {
+        prototype.set = function (arr) {
+          var l = this.length;
+          var i = 0;
+
+          for (; i < l; i++) {
+            this[i] = arr[i];
+          }
+        };
+      }
+      // END CUSTOM CODE
+
       for (i = 0; i < fullChunks; i++) {
         dest.set(src.subarray(srcPos, srcPos + elemsInThisChunk));
         srcPos += elemsInThisChunk;
