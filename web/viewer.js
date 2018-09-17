@@ -134,9 +134,9 @@ function getViewerConfiguration() {
       findField: document.getElementById('findInput'),
       highlightAllCheckbox: document.getElementById('findHighlightAll'),
       caseSensitiveCheckbox: document.getElementById('findMatchCase'),
+      entireWordCheckbox: document.getElementById('findEntireWord'),
       findMsg: document.getElementById('findMsg'),
       findResultsCount: document.getElementById('findResultsCount'),
-      findStatusIcon: document.getElementById('findStatusIcon'),
       findPreviousButton: document.getElementById('findPrevious'),
       findNextButton: document.getElementById('findNext'),
     },
@@ -166,6 +166,7 @@ function getViewerConfiguration() {
         'version': document.getElementById('versionField'),
         'pageCount': document.getElementById('pageCountField'),
         'pageSize': document.getElementById('pageSizeField'),
+        'linearized': document.getElementById('linearizedField'),
       },
     },
     errorWrapper: {
