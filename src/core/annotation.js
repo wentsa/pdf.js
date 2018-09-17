@@ -598,11 +598,25 @@ class WidgetAnnotation extends Annotation {
 
     data.readOnly = this.hasFieldFlag(AnnotationFieldFlag.READONLY);
 
+    // TCH skip image rendering for IE10 with signatures
+    if (data.fieldType === 'Sig' && this.isIe10()) {
+      console.warn('PDF with signature detected on IE10 browser -> skipping images rendering');
+      if (params && params.pdfManager && params.pdfManager.evaluatorOptions) {
+        params.pdfManager.evaluatorOptions.maxImageSize = 0;
+      } else {
+        console.error('Skipping images rendering failed', params);
+      }
+    }
+
     // Hide signatures because we cannot validate them.
     // if (data.fieldType === 'Sig') {
     //   this.setFlags(AnnotationFlag.HIDDEN);
     // }
     // TCH we need to see Sig widgets even not validated
+  }
+
+  isIe10() {
+    return window.navigator.appVersion.indexOf('MSIE 10') !== -1;
   }
 
   /**

@@ -47,34 +47,35 @@ function initializePDFJS(callback) {
     'pdfjs/display/network',
     'pdfjs/display/fetch_stream',
     'pdfjs/shared/is_node',
-    'pdfjs-test/unit/annotation_spec',
-    'pdfjs-test/unit/api_spec',
-    'pdfjs-test/unit/bidi_spec',
-    'pdfjs-test/unit/cff_parser_spec',
-    'pdfjs-test/unit/cmap_spec',
-    'pdfjs-test/unit/colorspace_spec',
-    'pdfjs-test/unit/crypto_spec',
-    'pdfjs-test/unit/custom_spec',
-    'pdfjs-test/unit/display_svg_spec',
-    'pdfjs-test/unit/document_spec',
-    'pdfjs-test/unit/dom_utils_spec',
-    'pdfjs-test/unit/encodings_spec',
-    'pdfjs-test/unit/evaluator_spec',
-    'pdfjs-test/unit/fonts_spec',
-    'pdfjs-test/unit/function_spec',
-    'pdfjs-test/unit/message_handler_spec',
-    'pdfjs-test/unit/metadata_spec',
-    'pdfjs-test/unit/murmurhash3_spec',
-    'pdfjs-test/unit/network_spec',
-    'pdfjs-test/unit/network_utils_spec',
-    'pdfjs-test/unit/parser_spec',
-    'pdfjs-test/unit/pdf_history_spec',
-    'pdfjs-test/unit/primitives_spec',
-    'pdfjs-test/unit/stream_spec',
-    'pdfjs-test/unit/type1_parser_spec',
-    'pdfjs-test/unit/ui_utils_spec',
-    'pdfjs-test/unit/unicode_spec',
-    'pdfjs-test/unit/util_spec',
+    'pdfjs-test/unit/TEST_DOCUMENT',
+    // 'pdfjs-test/unit/annotation_spec',
+    // 'pdfjs-test/unit/api_spec',
+    // 'pdfjs-test/unit/bidi_spec',
+    // 'pdfjs-test/unit/cff_parser_spec',
+    // 'pdfjs-test/unit/cmap_spec',
+    // 'pdfjs-test/unit/colorspace_spec',
+    // 'pdfjs-test/unit/crypto_spec',
+    // 'pdfjs-test/unit/custom_spec',
+    // 'pdfjs-test/unit/display_svg_spec',
+    // 'pdfjs-test/unit/document_spec',
+    // 'pdfjs-test/unit/dom_utils_spec',
+    // 'pdfjs-test/unit/encodings_spec',
+    // 'pdfjs-test/unit/evaluator_spec',
+    // 'pdfjs-test/unit/fonts_spec',
+    // 'pdfjs-test/unit/function_spec',
+    // 'pdfjs-test/unit/message_handler_spec',
+    // 'pdfjs-test/unit/metadata_spec',
+    // 'pdfjs-test/unit/murmurhash3_spec',
+    // 'pdfjs-test/unit/network_spec',
+    // 'pdfjs-test/unit/network_utils_spec',
+    // 'pdfjs-test/unit/parser_spec',
+    // 'pdfjs-test/unit/pdf_history_spec',
+    // 'pdfjs-test/unit/primitives_spec',
+    // 'pdfjs-test/unit/stream_spec',
+    // 'pdfjs-test/unit/type1_parser_spec',
+    // 'pdfjs-test/unit/ui_utils_spec',
+    // 'pdfjs-test/unit/unicode_spec',
+    // 'pdfjs-test/unit/util_spec',
   ].map(function (moduleName) {
     return SystemJS.import(moduleName);
   })).then(function(modules) {
@@ -119,7 +120,7 @@ function initializePDFJS(callback) {
 
   // Runner Parameters
   var queryString = new jasmine.QueryString({
-    getWindowLocation() {
+    getWindowLocation: function() {
       return window.location;
     },
   });
@@ -141,28 +142,28 @@ function initializePDFJS(callback) {
 
   // Reporters
   var htmlReporter = new jasmine.HtmlReporter({
-    env,
-    onStopExecutionClick() {
+    env: env,
+    onStopExecutionClick: function() {
       queryString.navigateWithNewParam('failFast',
                                        env.stoppingOnSpecFailure());
     },
-    onThrowExpectationsClick() {
+    onThrowExpectationsClick: function() {
       queryString.navigateWithNewParam('throwFailures',
                                        !env.throwingExpectationFailures());
     },
-    onRandomClick() {
+    onRandomClick: function() {
       queryString.navigateWithNewParam('random', !env.randomTests());
     },
-    addToExistingQueryString(key, value) {
+    addToExistingQueryString: function(key, value) {
       return queryString.fullStringWithNewParam(key, value);
     },
-    getContainer() {
+    getContainer: function() {
       return document.body;
     },
-    createElement() {
+    createElement: function() {
       return document.createElement.apply(document, arguments);
     },
-    createTextNode() {
+    createTextNode: function() {
       return document.createTextNode.apply(document, arguments);
     },
     timer: new jasmine.Timer(),
@@ -179,7 +180,7 @@ function initializePDFJS(callback) {
   // Filter which specs will be run by matching the start of the full name
   // against the `spec` query param.
   var specFilter = new jasmine.HtmlSpecFilter({
-    filterString() {
+    filterString: function() {
       return queryString.getParam('spec');
     },
   });
